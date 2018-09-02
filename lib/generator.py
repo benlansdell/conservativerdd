@@ -17,11 +17,11 @@ class LinearGenerator(object):
 		self.params = params
 
 	def context(self):
-		return = rand.rand()*(self.params.bounds[1]-self.params.bounds[0]) + self.params.bounds[0]
+		return rand.rand()*(self.params.bounds[1]-self.params.bounds[0]) + self.params.bounds[0]
 
 	def pull(self, ctx, a):
 		eta = rand.randn()*self.params.sigma_eps
-		exp_rewards = [ctx*self.params.alpha[a] + self.params.beta[a] for i in (0,1)]
+		exp_rewards = [ctx*self.params.alpha[i] + self.params.beta[i] for i in (0,1)]
 		exp_reward = exp_rewards[a]
 		regret = max(exp_rewards) - exp_reward
 		obs = exp_reward + eta

@@ -3,6 +3,7 @@
 * LinUCB
 * ThresholdBandit 
 """
+import numpy as np
 
 class Bandit(object):
  	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
@@ -27,24 +28,24 @@ class Bandit(object):
 		ctx = self.generator.context()
 		a = self.choose_arm(ctx)
 		obs, regret = self.generator.pull(ctx,a)
-		self.contexts[pull] = ctx
-		self.arms[pull] = a 
-		self.obs[pull] = obs
+		self.contexts[self.pull] = ctx
+		self.arms[self.pull] = a 
+		self.obs[self.pull] = obs
 		self.update_bandit()
 		self.pull += 1
 		return (ctx, a, obs, regret)
 
 class LinUCB(Bandit):
 	def choose_arm(self, ctx):
-		raise NotImplementedError
+		return 1
 
 	def update_bandit(self):
-		raise NotImplementedError
+		return None
 
 class ThresholdBandit(Bandit):
  	def __init__(self, generator, threshold = 0.5, delta = 0.1, n_pulls = 10000):
- 		self.threshold = threshold
- 		#Call parent init
+		self.threshold = threshold
+		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls)
 
 	#Threshold policy
 	def choose_arm(self, ctx):
@@ -55,4 +56,4 @@ class ThresholdBandit(Bandit):
 
 	#Update threshold
 	def update_bandit(self):
-		raise NotImplementedError
+		return None 
