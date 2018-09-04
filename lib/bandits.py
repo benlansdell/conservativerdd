@@ -5,6 +5,10 @@
 """
 import numpy as np
 
+def first_nonzero(arr, axis, invalid_val=-1):
+    mask = arr!=0
+    return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
+
 class BanditAlgorithm(object):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
 		self.generator = generator
@@ -15,25 +19,25 @@ class BanditAlgorithm(object):
 		self.pull = 0
 		self.delta = delta
 
-	def choose_arm(self, ctx):
-		raise NotImplementedError
-
-	def update_bandit(self):
-		raise NotImplementedError
-
 	def step(self):
 		if self.pull >= self.n_pulls:
 			print("Bandit: exceeded max pulls, returning 0")
 			return 0
 		ctx = self.generator.context()
-		arm_idx = self.choose_arm(ctx)
+		arm_idx = self._choose_arm(ctx)
 		obs, regret = self.generator.pull(ctx,arm_idx)
 		self.contexts[self.pull] = ctx
 		self.arms_idx[self.pull] = arm_idx
 		self.obs[self.pull] = obs
-		self.update_bandit()
+		self._update_bandit()
 		self.pull += 1
 		return (ctx, arm_idx, obs, regret)
+
+	def _choose_arm(self, ctx):
+		raise NotImplementedError
+
+	def _update_bandit(self):
+		raise NotImplementedError
 
 class LinUCB(BanditAlgorithm):
 	def __init__(self, generator, beta = 2, delta = 0.1, n_pulls = 10000):
@@ -43,7 +47,7 @@ class LinUCB(BanditAlgorithm):
 		self.U = np.atleast_2d(np.zeros(4)).T
 		super(LinUCB, self).__init__(generator, delta = delta, n_pulls = n_pulls)
 
-	def choose_arm(self, ctx):
+	def _choose_arm(self, ctx):
 		theta = np.dot(np.linalg.inv(self.V), self.U)
 		ucbs = []
 		for arm in [self.arms(ctx, i) for i in range(2)]:
@@ -53,7 +57,7 @@ class LinUCB(BanditAlgorithm):
 			ucbs.append(ucb[0][0])
 		return ucbs.index(max(ucbs))
 
-	def update_bandit(self):
+	def _update_bandit(self):
 		ctx = self.contexts[self.pull]
 		arm = self.arms(ctx, self.arms_idx[self.pull])
 		arm = np.atleast_2d(arm).T
@@ -61,24 +65,52 @@ class LinUCB(BanditAlgorithm):
 		self.V += np.dot(arm, arm.T)
 		self.U += obs*arm
 
+	def predict(self, ctx, arm_idx):
+		arm = self.arms(ctx, arm_idx)
+		arm = np.atleast_2d(arm).T
+		theta = np.dot(np.linalg.inv(self.V), self.U)
+		pred = np.dot(theta.T, arm)
+		return pred
+
+	def predict_upper(self, ctx, arm_idx):
+		arm = self.arms(ctx, arm_idx)
+		arm = np.atleast_2d(arm).T
+		theta = np.dot(np.linalg.inv(self.V), self.U)
+		pred = np.dot(theta.T, arm)
+		pred += self.beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+		return pred
+
+	def predict_lower(self, ctx, arm_idx):
+		arm = self.arms(ctx, arm_idx)
+		arm = np.atleast_2d(arm).T
+		theta = np.dot(np.linalg.inv(self.V), self.U)
+		pred = np.dot(theta.T, arm)
+		pred -= self.beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+		return pred
+
 class ThresholdBandit(LinUCB):
 	def __init__(self, generator, threshold = 0.5, beta = 2, delta = 0.1, n_pulls = 10000):
 		self.threshold = threshold
+		N = 100
+		self.xvals = np.linspace(*generator.params.bounds, num=N)
 		super(ThresholdBandit, self).__init__(generator, beta = beta, delta = delta, n_pulls = n_pulls)
 
-	#Threshold policy
-	def choose_arm(self, ctx):
+	def _choose_arm(self, ctx):
 		if ctx < self.threshold:
 			return 0
 		else:
 			return 1
 
-	#Update threshold
-	def update_bandit(self):
-		arm = self.arms[self.arms[-1],:]
-		arm = np.atleast_2d(arm).T
-		obs = self.obs[-1]
-		self.V += np.dot(arm, arm.T)
-		self.U += obs*arm
-
-		#
+	def _update_bandit(self):
+		super(ThresholdBandit, self)._update_bandit()
+		minmax = np.zeros((self.xvals.shape[0], 2))
+		minmax[:, 0] = [self.predict_lower(i, 0) - self.predict_upper(i, 1) for i in self.xvals]
+		minmax[:, 1] = [self.predict_lower(i, 1) - self.predict_upper(i, 0) for i in self.xvals]
+		z0 = self.xvals[first_nonzero(minmax[:,0]<0, 0)]
+		z1 = self.xvals[first_nonzero(minmax[:,1]<0, 0)]
+		print z0,z1
+		z0, z1 = min(z0, z1), max(z0, z1)
+		print z0,z1
+		self.threshold = min(z1, max(self.threshold, z0))
+		self.lower_bound = z0
+		self.upper_bound = z1
