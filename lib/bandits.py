@@ -97,6 +97,21 @@ class LinUCB(BanditAlgorithm):
 		pred -= self.beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 		return pred
 
+	def pred_arm(self, arm_idx, N = 100):
+		xvals = np.linspace(0, 1, N)
+		upper = np.zeros(N)
+		lower = np.zeros(N)
+		mean = np.zeros(N)
+		for ctx in xvals:
+			arm = self.arms(ctx, arm_idx)
+			arm = np.atleast_2d(arm).T
+			theta = np.dot(np.linalg.inv(self.V), self.U)
+			pred = np.dot(theta.T, arm)
+			lower = pred - self.beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+			upper = pred + self.beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+		return pred, lower, upper
+
+
 class ThresholdBandit(LinUCB):
 	def __init__(self, generator, threshold = 0.5, beta = 2, delta = 0.1, n_pulls = 10000):
 		self.threshold = threshold
