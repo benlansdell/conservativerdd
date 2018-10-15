@@ -39,6 +39,15 @@ class BanditAlgorithm(object):
 	def _update_bandit(self):
 		raise NotImplementedError
 
+	def predict(self, ctx, arm_idx):
+		raise NotImplementedError
+
+	def predict_upper(self, ctx, arm_idx):
+		raise NotImplementedError
+
+	def predict_lower(self, ctx, arm_idx):
+		raise NotImplementedError
+		
 class LinUCB(BanditAlgorithm):
 	def __init__(self, generator, beta = 2, delta = 0.1, n_pulls = 10000):
 		self.beta = beta
@@ -102,15 +111,25 @@ class ThresholdBandit(LinUCB):
 			return 1
 
 	def _update_bandit(self):
+		#Update ridge regression parameters
 		super(ThresholdBandit, self)._update_bandit()
 		minmax = np.zeros((self.xvals.shape[0], 2))
+
+		self.lower_bound = 0
+		self.upper_bound = 1
+
+		#This is finding al0 = au1
 		minmax[:, 0] = [self.predict_lower(i, 0) - self.predict_upper(i, 1) for i in self.xvals]
-		minmax[:, 1] = [self.predict_lower(i, 1) - self.predict_upper(i, 0) for i in self.xvals]
-		z0 = self.xvals[first_nonzero(minmax[:,0]<0, 0)]
-		z1 = self.xvals[first_nonzero(minmax[:,1]<0, 0)]
-		print z0,z1
-		z0, z1 = min(z0, z1), max(z0, z1)
-		print z0,z1
-		self.threshold = min(z1, max(self.threshold, z0))
-		self.lower_bound = z0
-		self.upper_bound = z1
+		#This is finding al1 = au0
+		minmax[:, 1] = [self.predict_upper(i, 0) - self.predict_lower(i, 1) for i in self.xvals]
+
+		#print minmax
+
+		#Check if there's a change in sign. If there isn't, then lower bound stays at 0
+		if not np.all(minmax[:,0] < 0) and not np.all(minmax[:,0] > 0):
+			self.lower_bound = self.xvals[first_nonzero(minmax[:,0]<0, 0)]
+
+		if not np.all(minmax[:,1] < 0) and not np.all(minmax[:,1] > 0):
+			self.upper_bound = self.xvals[first_nonzero(minmax[:,1]<0, 0)]
+
+		self.threshold = min(self.upper_bound, max(self.threshold, self.lower_bound))
