@@ -2,6 +2,7 @@
 
 * LinUCB
 * ThresholdBandit 
+* Greedy algorithm
 """
 import numpy as np
 
@@ -48,12 +49,17 @@ class BanditAlgorithm(object):
 	def predict_lower(self, ctx, arm_idx):
 		raise NotImplementedError
 		
+
+#Derive the bounds from the confidence interval
+
+#Extend to higher dimensions
+
 class LinUCB(BanditAlgorithm):
 	def __init__(self, generator, beta = 2, delta = 0.1, n_pulls = 10000):
 		self.beta = beta
 		self.arms = lambda ctx, arm: (1, ctx, 0, 0) if arm == 1 else (0, 0, 1, ctx)
 		self.V = np.identity(4)
-		self.U = np.atleast_2d(np.zeros(4)).T
+		self.U = np.atleast_2d(np.ones(4)).T
 		super(LinUCB, self).__init__(generator, delta = delta, n_pulls = n_pulls)
 
 	def _choose_arm(self, ctx):
@@ -111,6 +117,16 @@ class LinUCB(BanditAlgorithm):
 			upper = pred + self.beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 		return pred, lower, upper
 
+class GreedyBandit(LinUCB):
+
+	def _choose_arm(self, ctx):
+		theta = np.dot(np.linalg.inv(self.V), self.U)
+		ucbs = []
+		for arm in [self.arms(ctx, i) for i in range(2)]:
+			arm = np.atleast_2d(arm).T
+			ucb = np.dot(theta.T, arm)
+			ucbs.append(ucb[0][0])
+		return ucbs.index(max(ucbs))
 
 class ThresholdBandit(LinUCB):
 	def __init__(self, generator, threshold = 0.5, beta = 2, delta = 0.1, n_pulls = 10000):
