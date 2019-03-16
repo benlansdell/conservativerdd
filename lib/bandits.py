@@ -176,7 +176,7 @@ class ThresholdBandit(LinUCB):
 				#Greedy update
 				theta_k = theta_hat_k
 				#Conservative update
-				#theta_k = theta_hat_k + np.sqrt(beta_k)*diff_k/norm_k
+				#theta_k = theta_hat_k + beta_k*diff_k/norm_k
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
 		#self.threshold = min(self.upper_bound, max(self.threshold, self.lower_bound))

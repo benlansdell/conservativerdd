@@ -16,7 +16,7 @@ max_beta = 2
 
 k = 4    #Number of arms
 d = 10   #Dimension of context (includes one dim for intercept term)
-intercept = False
+intercept = True
 
 if alg == 'greedy':
 	BanditAlg = GreedyBandit
