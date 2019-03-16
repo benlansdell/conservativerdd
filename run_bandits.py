@@ -1,4 +1,4 @@
-from lib.bandits import LinUCB, ThresholdBandit, GreedyBandit 
+from lib.bandits import LinUCB, ThresholdBandit, ThresholdConsBandit, GreedyBandit 
 from lib.generator import LinearGeneratorParams, LinearGenerator
 import numpy as np 
 from scipy.stats import truncnorm
@@ -8,6 +8,7 @@ N = 10000 #number of timesteps
 #alg = 'greedy'
 #alg = 'linucb'
 alg = 'threshold'
+#alg = 'thresholdcons'
 
 save = True
 
@@ -24,6 +25,10 @@ elif alg == 'linucb':
 	BanditAlg = LinUCB
 elif alg == 'threshold':
 	BanditAlg = ThresholdBandit
+elif alg == 'thresholdcons':
+	BanditAlg = ThresholdConsBandit
+else:
+	print "Select a valid algorithm"
 
 #Generate slopes and intercepts
 alphas = truncnorm.rvs(-max_alpha, max_alpha, scale = 1, size=(M,k,d-1))
@@ -32,6 +37,7 @@ betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))
 regret = np.zeros((M, N))
 arm_pulls = np.zeros((M, N, k))
 n_changes = np.zeros((M, N))
+update_pol = np.zeros((M, N))
 
 print("Running %s algorithm"%alg)
 fn_out = './runs/bandit_%s_M_%d_N_%d.npz'%(alg, M, N)
@@ -47,6 +53,7 @@ for m in range(M):
 		#print((arm_idx, obs, r))
 		regret[m,i] = r
 		arm_pulls[m,i,arm_idx] = 1
+	update_pol[m,:] = bandit.update_theta
 
 if save:
-	np.savez(fn_out, regret = regret, arm_pulls = arm_pulls)
+	np.savez(fn_out, regret = regret, arm_pulls = arm_pulls, update_pol = update_pol)

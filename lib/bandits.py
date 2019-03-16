@@ -138,6 +138,7 @@ class GreedyBandit(LinUCB):
 class ThresholdBandit(LinUCB):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
 		alpha = generator.params.alpha
+		self.update_theta = np.zeros(n_pulls)
 		#How to start the arms?????
 		#self.theta_tilde = np.ones((alpha.shape[0], alpha.shape[1]+1))
 		self.theta_tilde = np.random.rand(alpha.shape[0], alpha.shape[1]+1)
@@ -175,8 +176,42 @@ class ThresholdBandit(LinUCB):
 				print "Updating theta_tilde"
 				#Greedy update
 				theta_k = theta_hat_k
+				self.update_theta[self.pull] = 1
 				#Conservative update
 				#theta_k = theta_hat_k + beta_k*diff_k/norm_k
+			self.theta_tilde[idx,:] = np.squeeze(theta_k)
+
+		#self.threshold = min(self.upper_bound, max(self.threshold, self.lower_bound))
+
+class ThresholdConsBandit(ThresholdBandit):
+
+	def _update_bandit(self):
+
+		#Update ridge regression parameters
+		super(ThresholdBandit, self)._update_bandit()
+
+		#Then project each theta_tilde parameter onto the confidence set for each arm
+		k = self.k
+		d = self.d
+		for idx in range(k):
+			#Get arm k's V and U
+			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+			U_k = self.U[idx*d:((idx+1)*d)]
+			theta_k = np.atleast_2d(self.theta_tilde[idx,:]).T
+			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
+			diff_k = theta_k - theta_hat_k
+			beta_k = self.beta(V_k)
+			#beta_k = self.beta(self.V)
+			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
+			#norm_k = np.dot(diff_k.T, np.dot(np.linalg.self.V, diff_k))
+			#If theta_k is not in confidence region then update
+			if norm_k > beta_k:
+				#print "Updating theta_tilde"
+				#Greedy update
+				#theta_k = theta_hat_k
+				#Conservative update
+				self.update_theta[self.pull] = 1
+				theta_k = theta_hat_k + beta_k*diff_k/norm_k
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
 		#self.threshold = min(self.upper_bound, max(self.threshold, self.lower_bound))
