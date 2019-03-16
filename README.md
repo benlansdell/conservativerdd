@@ -1,3 +1,3 @@
 # conservativerdd
 
-Implements LinUCB and a threshold bandit algorithm
+Implements LinUCB, a threshold bandit algorithm and a greedy bandit algorithm
