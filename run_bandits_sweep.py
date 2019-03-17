@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 from lib.bandits import LinUCB, ThresholdBandit, ThresholdConsBandit, GreedyBandit 
 from lib.generator import LinearGeneratorParams, LinearGenerator
 import numpy as np 
 from scipy.stats import truncnorm
+import argparse
 
 def get_args():
 	argparser = argparse.ArgumentParser(description=__doc__)
@@ -20,11 +22,6 @@ def main():
 
 	M = 30    #number of runs
 	N = 10000 #number of timesteps
-	
-	#alg = 'greedy'
-	#alg = 'linucb'
-	#alg = 'threshold'
-	#alg = 'thresholdcons'
 	
 	save = True
 	
@@ -58,7 +55,7 @@ def main():
 			n_changes = np.zeros((M, N))
 			update_pol = np.zeros((M, N))
 			
-			print("Running %s algorithm"%alg)
+			print("Running %s algorithm with d=%d, k=%d"%(alg, d, k))
 			fn_out = './runs/bandit_%s_d_%d_k_%d_M_%d_N_%d.npz'%(alg, d, k, M, N)
 			
 			for m in range(M):
@@ -72,7 +69,8 @@ def main():
 					#print((arm_idx, obs, r))
 					regret[m,n] = r
 					arm_pulls[m,n,arm_idx] = 1
-				update_pol[m,:] = bandit.update_theta
+				if hasattr(bandit, 'update_theta'):
+					update_pol[m,:] = bandit.update_theta
 			
 			if save:
 				np.savez(fn_out, regret = regret, arm_pulls = arm_pulls, update_pol = update_pol)
