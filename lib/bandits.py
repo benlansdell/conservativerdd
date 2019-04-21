@@ -10,6 +10,13 @@ def first_nonzero(arr, axis, invalid_val=-1):
     mask = arr!=0
     return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
+#Compute expected regret for a current configuration and context distribution. A sampling approach
+def expected_regret(bandit_alg, generator, N_pulls = 100000):
+	ctxs = generator.contexts(N_pulls)
+	actions = bandit_alg.choose_arms(ctxs)
+	_, regret, _ = generator.pulls(ctxs, actions)
+	return np.mean(regret)
+
 class BanditAlgorithm(object):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
 		self.generator = generator
@@ -28,13 +35,16 @@ class BanditAlgorithm(object):
 			return 0
 		ctx = self.generator.context()
 		arm_idx = self._choose_arm(ctx)
-		obs, regret = self.generator.pull(ctx,arm_idx)
+		obs, regret, _ = self.generator.pull(ctx,arm_idx)
 		self.contexts[self.pull,:] = ctx
 		self.arms_idx[self.pull] = arm_idx
 		self.obs[self.pull] = obs
 		self._update_bandit()
 		self.pull += 1
 		return (ctx, arm_idx, obs, regret)
+
+	def choose_arms(self, ctxs):
+		raise NotImplementedError
 
 	def _choose_arm(self, ctx):
 		raise NotImplementedError
@@ -51,12 +61,9 @@ class BanditAlgorithm(object):
 	def predict_lower(self, ctx, arm_idx):
 		raise NotImplementedError
 
-#Derive the bounds from the confidence interval
-
 class LinUCB(BanditAlgorithm):
 
 	def arms(self, ctx, arm):
-		#print arm 
 		a = np.zeros(self.d*self.k)
 		a[int(arm)*self.d:((int(arm)+1)*self.d)] = ctx
 		return a
@@ -144,6 +151,15 @@ class ThresholdBandit(LinUCB):
 		self.theta_tilde = np.random.rand(alpha.shape[0], alpha.shape[1]+1)
 		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls)
 
+	def choose_arms(self, ctxs):
+		N = ctxs.shape[0]
+		vals = np.zeros((N, self.k))
+		for idx in range(self.k):
+			theta_k = self.theta_tilde[idx,:]
+			val = np.dot(ctxs,theta_k)
+			vals[:,idx] = val
+		return np.argmax(vals, axis = 1)
+
 	def _choose_arm(self, ctx):
 		vals = []
 		for idx in range(self.k):
@@ -168,20 +184,16 @@ class ThresholdBandit(LinUCB):
 			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
 			diff_k = theta_k - theta_hat_k
 			beta_k = self.beta(V_k)
-			#beta_k = self.beta(self.V)
 			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
-			#norm_k = np.dot(diff_k.T, np.dot(np.linalg.self.V, diff_k))
 			#If theta_k is not in confidence region then update
 			if norm_k > beta_k:
+				self.update_theta[self.pull] = 1
 				print "Updating theta_tilde"
 				#Greedy update
 				theta_k = theta_hat_k
-				self.update_theta[self.pull] = 1
 				#Conservative update
 				#theta_k = theta_hat_k + beta_k*diff_k/norm_k
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
-
-		#self.threshold = min(self.upper_bound, max(self.threshold, self.lower_bound))
 
 class ThresholdConsBandit(ThresholdBandit):
 
@@ -201,17 +213,13 @@ class ThresholdConsBandit(ThresholdBandit):
 			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
 			diff_k = theta_k - theta_hat_k
 			beta_k = self.beta(V_k)
-			#beta_k = self.beta(self.V)
 			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
-			#norm_k = np.dot(diff_k.T, np.dot(np.linalg.self.V, diff_k))
 			#If theta_k is not in confidence region then update
 			if norm_k > beta_k:
+				self.update_theta[self.pull] = 1
 				#print "Updating theta_tilde"
 				#Greedy update
 				#theta_k = theta_hat_k
 				#Conservative update
-				self.update_theta[self.pull] = 1
 				theta_k = theta_hat_k + beta_k*diff_k/norm_k
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
-
-		#self.threshold = min(self.upper_bound, max(self.threshold, self.lower_bound))
