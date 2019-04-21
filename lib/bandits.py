@@ -79,6 +79,7 @@ class LinUCB(BanditAlgorithm):
 	def _choose_arm(self, ctx):
 		theta = np.dot(np.linalg.inv(self.V), self.U)
 		ucbs = []
+		#print(np.linalg.det(self.V))
 		for arm in [self.arms(ctx, i) for i in range(self.k)]:
 			arm = np.atleast_2d(arm).T
 			ucb = np.dot(theta.T, arm)
@@ -143,13 +144,14 @@ class GreedyBandit(LinUCB):
 		return vals.index(max(vals))
 
 class ThresholdBandit(LinUCB):
-	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
-		alpha = generator.params.alpha
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4):
+#		alpha = generator.params.alpha
 		self.update_theta = np.zeros(n_pulls)
 		#How to start the arms?????
 		#self.theta_tilde = np.ones((alpha.shape[0], alpha.shape[1]+1))
-		self.theta_tilde = np.random.rand(alpha.shape[0], alpha.shape[1]+1)
-		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls)
+#		self.theta_tilde = np.random.rand(alpha.shape[0], alpha.shape[1]+1)
+		self.theta_tilde = np.random.rand(generator.params.k, generator.params.d)
+		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
 
 	def choose_arms(self, ctxs):
 		N = ctxs.shape[0]
@@ -188,7 +190,6 @@ class ThresholdBandit(LinUCB):
 			#If theta_k is not in confidence region then update
 			if norm_k > beta_k:
 				self.update_theta[self.pull] = 1
-				print "Updating theta_tilde"
 				#Greedy update
 				theta_k = theta_hat_k
 				#Conservative update
