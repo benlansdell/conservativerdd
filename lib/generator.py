@@ -50,7 +50,50 @@ class LinearGenerator(object):
 		regret = np.max(exp_rewards,axis=0) - exp_reward
 		obs = exp_reward + etas
 		return obs, regret, exp_reward    
-    
+
+class IHDPParams(object):
+	def __init__(self, fn_in, batch = 0, shuffle = True):
+		data = np.load(fn_in)
+		n, b = data['mu1'].shape
+		d = data['x'].shape[1]
+		t = data['t']
+		self.batch = batch
+		self.ctx = data['x']
+		self.expt_reward = np.zeros((n, 2, b))
+		self.expt_reward[:,0,:] = data['mu0']
+		self.expt_reward[:,1,:] = data['mu1']
+		self.y = np.zeros((n, 2, b))
+		self.y[:,0,:] = np.where((t == 0), data['yf'], data['ycf'])
+		self.y[:,1,:] = np.where((t == 1), data['yf'], data['ycf'])
+		self.pull = 0
+		self.n = n
+		self.d = d
+		self.k = 2
+		if shuffle:
+			sh = np.arange(n)
+			rand.shuffle(sh)
+			self.ctx = np.squeeze(self.ctx[sh,:,:])
+			self.expt_reward = np.squeeze(self.expt_reward[sh,:,:])
+			self.y = np.squeeze(self.y[sh,:,:])
+
+class IHDPGenerator(object):
+	def __init__(self, params):
+		self.params = params
+		self.pull_idx = 0
+
+	def context(self):
+		ctx = self.params.ctx[self.pull_idx,:,self.params.batch]
+		self.pull_idx += 1
+		self.pull_idx = self.pull_idx % self.params.n
+		return ctx
+
+	def pull(self, ctx, a):
+		exp_rewards = self.params.expt_reward[self.pull_idx,:,self.params.batch]
+		exp_reward_a = exp_rewards[a]
+		regret = max(exp_rewards) - exp_reward_a
+		obs = self.params.y[self.pull_idx,a,self.params.batch]
+		return obs, regret, exp_reward_a
+
 class DataGeneratorParams(object):
 
 	def __init__(self, df, yInd, xInds=None, intercept = True):
@@ -72,19 +115,6 @@ class DataGeneratorParams(object):
 				self.xInds.append(df.shape[1])
 		self.d = len(self.xInds)
 		self.k = df[df.columns[yInd]].unique().shape[0]
-        #self._init_true_params()
-
-	def _init_true_params(self):
-		self.theta = np.zeros((self.d, self.k))
-		#For each arm
-		for idx in range(self.k):
-			#Get the data
-			data = self.df.loc[self.df['Class'] == idx+1].values
-			#Solve the least squares
-
-
-			#Save the params
-
 
 class DataGenerator(object):
 
