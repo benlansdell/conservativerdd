@@ -241,16 +241,15 @@ class ConsLinUCB(BanditAlgorithm):
 	https://arxiv.org/pdf/1611.06426.pdf
 	"""
 
-	def __init__(self, generator, baseline_params, delta = 0.1, n_pulls = 10000, lambd = 1e-4, alpha = 0.1):
-		L = 1
+	def __init__(self, generator, baseline_params, delta = 0.001, n_pulls = 10000, lambd = 1e-4, alpha = 0.1):
+		self.L = 1
 		self.alpha = alpha
 		self.baseline_alpha = baseline_params[0]
 		self.baseline_beta = baseline_params[1]
 		self.lamd = lambd*n_pulls
-		self.beta = lambda v: np.sqrt(self.lamd)*L + np.sqrt(np.log(np.linalg.det(v))-self.d*np.log(self.lamd)-2*np.log(delta))
+		self.beta = lambda v: np.sqrt(self.lamd)*self.L + np.sqrt(np.log(np.linalg.det(v))-self.d*np.log(self.lamd)-2*np.log(delta))
 		self.V = self.lamd*np.identity(generator.params.k*generator.params.d)
 		self.U = np.atleast_2d(np.ones(generator.params.k*generator.params.d)).T
-		self.z = np.zeros(generator.params.d)
 		self.reward_baseline_cons = 0
 		self.reward_baseline_all = 0
 		super(ConsLinUCB, self).__init__(generator, delta = delta, n_pulls = n_pulls)
@@ -268,13 +267,16 @@ class ConsLinUCB(BanditAlgorithm):
 		self.reward_baseline_all += baseline_reward
 		L = self._compute_L(opt_arm_idx, ctx) + self.reward_baseline_cons
 		#Decide to play optimistic or baseline action
+		#print("LHS: %f, RHS: %f"%(L, (1-self.alpha)*self.reward_baseline_all))
 		if L >= (1-self.alpha)*self.reward_baseline_all:
+		#if 2 > 1:
 			arm_idx = opt_arm_idx
 			obs, regret, _ = self.generator.pull(ctx,arm_idx)
 			self.contexts[self.pull,:] = ctx
 			self.arms_idx[self.pull] = arm_idx
 			self.obs[self.pull] = obs
 			self._update_bandit()
+			#print("Not playing baseline!")
 		else:
 			arm_idx = -1
 			self.reward_baseline_cons += baseline_reward
@@ -292,6 +294,7 @@ class ConsLinUCB(BanditAlgorithm):
 			if idx == opt_arm_idx:
 				zt += ctx
 			L += self.predict_lower(zt, idx)
+		#print("L is %f"%L)
 		return L
 
 	def arms(self, ctx, arm):
@@ -347,12 +350,18 @@ class ConsLinUCB(BanditAlgorithm):
 		pred += self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 		return pred
 
-	def predict_lower(self, ctx, arm_idx):
-		arm = self.arms(ctx, arm_idx)
-		arm = np.atleast_2d(arm).T
-		theta = np.dot(np.linalg.inv(self.V), self.U)
-		pred = np.dot(theta.T, arm)
-		pred -= self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+	def predict_lower(self, ctx, idx):
+		arm_idxs = self.arms_idx[0:self.pull]
+		arm_idxs = arm_idxs[arm_idxs == idx]
+		if len(arm_idxs) == 0:
+			pred = 0
+		else:
+			d = self.d
+			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+			U_k = self.U[idx*d:((idx+1)*d)]
+			theta = np.dot(np.linalg.inv(V_k), U_k)
+			pred = np.dot(theta.T, ctx)
+			pred -= self.beta(V_k)*np.sqrt(np.dot(ctx.T, np.dot(np.linalg.inv(V_k), ctx)))
 		return pred
 
 	def pred_arm(self, arm_idx, N = 100):
