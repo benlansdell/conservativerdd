@@ -1,4 +1,4 @@
-from lib.bandits import LinUCB, ThresholdBandit, ThresholdConsBandit, GreedyBandit, ConsLinUCB, expected_regret
+from lib.bandits import LinUCB, ThresholdBandit, ThresholdConsBandit, ThresholdMaxConsBandit, GreedyBandit, ConsLinUCB, ThresholdBaselineBandit, expected_regret
 from lib.generator import LinearGeneratorParams, LinearGenerator
 import numpy as np 
 from scipy.stats import truncnorm
@@ -7,7 +7,9 @@ from scipy.stats import truncnorm
 #alg = 'linucb'
 #alg = 'threshold'
 #alg = 'thresholdcons'
-alg = 'conslinucb'
+#alg = 'thresholdmaxcons'
+alg = 'thresholdbaseline'
+#alg = 'conslinucb'
 
 M = 30    #number of runs
 N = 10000 #number of timesteps
@@ -27,6 +29,10 @@ elif alg == 'threshold':
 	BanditAlg = ThresholdBandit
 elif alg == 'thresholdcons':
 	BanditAlg = ThresholdConsBandit
+elif alg == 'thresholdmaxcons':
+	BanditAlg = ThresholdMaxConsBandit
+elif alg == 'thresholdbaseline':
+	BanditAlg = ThresholdBaselineBandit
 elif alg == 'conslinucb':
 	BanditAlg = ConsLinUCB
 else:
@@ -51,7 +57,9 @@ fn_out = './runs/bandit_%s_M_%d_N_%d.npz'%(alg, M, N)
 for m in range(M):
 	params = LinearGeneratorParams(np.atleast_2d(alphas[m,:,:]), betas[m,:], d = d, k = k, intercept = intercept)
 	generator = LinearGenerator(params)
-	bandit = BanditAlg(generator, (np.squeeze(baseline_alphas[m,:]), baseline_betas[m,0]))
+	bandit = BanditAlg(generator)
+	#For CLUCB
+	#bandit = BanditAlg(generator, (np.squeeze(baseline_alphas[m,:]), baseline_betas[m,0]))
 	print("Run: %d/%d"%(m+1,M))
 	for i in range(N):
 		(ctx, arm_idx, obs, r) = bandit.step()

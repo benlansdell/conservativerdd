@@ -21,6 +21,9 @@ def expected_regret(bandit_alg, generator, N_pulls = 100000):
 	_, regret, _ = generator.pulls(ctxs, actions)
 	return np.mean(regret)
 
+#The exact quadrature implementation
+
+
 class BanditAlgorithm(object):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
 		self.generator = generator
@@ -203,12 +206,93 @@ class ThresholdBandit(LinUCB):
 				#theta_k = theta_hat_k + beta_k*diff_k/norm_k
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
+class ThresholdBaselineBandit(ThresholdBandit):
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4):
+		self.update_theta = np.zeros(n_pulls)
+		self.theta_tilde = np.random.rand(generator.params.k, generator.params.d)
+		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+
+	#def choose_arms(self, ctxs):
+	#	N = ctxs.shape[0]
+	#	vals = np.zeros((N, self.k))
+	#	for idx in range(self.k):
+	#		theta_k = self.theta_tilde[idx,:]
+	#		val = np.dot(ctxs,theta_k)
+	#		vals[:,idx] = val
+	#	return np.argmax(vals, axis = 1)
+
+	def _choose_arm(self, ctx):
+		vals = np.zeros(self.k)
+		preds_low = np.zeros(self.k)
+		preds_high = np.zeros(self.k)
+		viable = np.ones(self.k)
+		for idx in range(self.k):
+			arm = self.arms(ctx, idx)
+			arm = np.atleast_2d(arm).T
+			theta = np.dot(np.linalg.inv(self.V), self.U)
+			pred = np.dot(theta.T, arm)
+			pm = self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+			pred_high = pred + pm
+			pred_low = pred - pm
+			theta_k = self.theta_tilde[idx,:]
+			val = np.dot(theta_k.T, ctx)
+			vals[idx] = val
+			preds_high[idx] = pred_high
+			preds_low[idx] = pred_low
+
+		#Determine which arms aren't viable
+		for idx in range(self.k):
+			if preds_high[idx] < np.max(preds_low):
+				viable[idx] = 0
+
+		#Play according to theta_zero for the viable arms
+		return vals.tolist().index(max(vals[viable.astype(bool)]))
+
+	def _update_bandit(self):
+		#Don't update theta_tilde here....
+		pass
+
 class ThresholdConsBandit(ThresholdBandit):
 
 	def _update_bandit(self):
 
 		#Update ridge regression parameters
 		super(ThresholdBandit, self)._update_bandit()
+
+		#Then project each theta_tilde parameter onto the confidence set for each arm
+		k = self.k
+		d = self.d
+		for idx in range(k):
+			#Get arm k's V and U
+			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+			U_k = self.U[idx*d:((idx+1)*d)]
+			theta_k = np.atleast_2d(self.theta_tilde[idx,:]).T
+			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
+			diff_k = theta_k - theta_hat_k
+			beta_k = self.beta(V_k)
+			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
+			#If theta_k is not in confidence region then update
+			if norm_k > beta_k:
+				self.update_theta[self.pull] = 1
+				#print "Updating theta_tilde"
+				#Greedy update
+				#theta_k = theta_hat_k
+				#Conservative update
+				theta_k = theta_hat_k + beta_k*diff_k/norm_k
+			self.theta_tilde[idx,:] = np.squeeze(theta_k)
+
+class ThresholdMaxConsBandit(ThresholdBandit):
+
+	def _update_bandit(self):
+
+		#Update ridge regression parameters
+		super(ThresholdBandit, self)._update_bandit()
+
+		#Now we only update parameters if outside the decision boundary.
+
+		#This involves minimizing the cosine distance between the decision lines...
+
+		#Solve with ADMM? 
 
 		#Then project each theta_tilde parameter onto the confidence set for each arm
 		k = self.k
