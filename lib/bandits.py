@@ -26,8 +26,16 @@ def expected_regret(bandit_alg, generator, N_pulls = 100000):
 	_, regret, _ = generator.pulls(ctxs, actions)
 	return np.mean(regret)
 
-#The exact quadrature implementation
-
+#Compute expected regret for a current configuration and context distribution. A sampling approach
+def expected_regret_per_arm(bandit_alg, generator, N_pulls = 100000):
+	ctxs = generator.contexts(N_pulls)
+	#Returns for each arm
+	k = bandit_alg.k
+	means = np.zeros(k)
+	for idx in range(k):
+		_, regret, _ = generator.pulls(ctxs, np.ones(N_pulls)*idx)
+		means[idx] = np.mean(regret)	
+	return means
 
 class BanditAlgorithm(object):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
@@ -186,6 +194,7 @@ class RarelySwitchingLinUCB(LinUCB):
 		if np.linalg.det(self.V_curr) > (1+self.C)*np.linalg.det(self.V):
 			self.U = self.U_curr.copy()
 			self.V = self.V_curr.copy()
+			self.update_theta[self.pull] = 1
 
 class ThresholdBandit(LinUCB):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4):
@@ -243,9 +252,9 @@ class ThresholdBandit(LinUCB):
 class ThresholdBaselineBandit(ThresholdBandit):
 	def __init__(self, generator, params, delta = 0.1, n_pulls = 10000, lambd = 1e-4, exp_hor = 5):
 		self.update_theta = np.zeros(n_pulls)
-		self.theta_tilde = params
 		self.explore_horizon = generator.params.k * exp_hor
-		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+		super(ThresholdBaselineBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+		self.theta_tilde = params
 
 	#def choose_arms(self, ctxs):
 	#	N = ctxs.shape[0]
@@ -294,6 +303,19 @@ class ThresholdBaselineBandit(ThresholdBandit):
 
 	def _update_bandit(self):
 		#Don't update theta_tilde here....
+		pass
+
+"""This bandit knows the true parameters, identifies the third best arm, on average, and always plays that. """
+class BaselineBandit(ThresholdBandit):
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, exp_hor = 5):
+		#Compute the expected regret of each arm... decide on the arm to play
+
+		super(BaselineBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+
+	def _choose_arm(self, ctx):
+		return self.baseline_arm
+
+	def _update_bandit(self):
 		pass
 
 class ThresholdConsBandit(ThresholdBandit):
