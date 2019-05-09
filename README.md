@@ -7,4 +7,4 @@ Implements:
 * LinUCB
 * a greedy linear algorithm
 * some threshold bandit algorithms
-* CLUCB
+* CLUCB (from Kazerouni et al 2017)
