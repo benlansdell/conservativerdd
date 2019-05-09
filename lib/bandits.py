@@ -5,6 +5,11 @@
 * ThresholdConsBandit
 * Greedy algorithm
 * Conservative LinUCB algorithm (Kazerouni et al 2017)
+
+* Rarely switching LinUCB
+* Baseline bandit
+
+* MinAngle bandit, replaces ThresholdConsBandit
 """
 
 import numpy as np
@@ -153,6 +158,35 @@ class GreedyBandit(LinUCB):
 			vals.append(val[0][0])
 		return vals.index(max(vals))
 
+class RarelySwitchingLinUCB(LinUCB):
+	#Only update the used parameters when....
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, C = 0.3):
+		self.C = C
+		super(RarelySwitchingLinUCB, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+		self.V_curr = self.V.copy()
+		self.U_curr = self.U.copy()
+
+	def _choose_arm(self, ctx):
+		theta = np.dot(np.linalg.inv(self.V), self.U)
+		vals = []
+		for arm in [self.arms(ctx, i) for i in range(self.k)]:
+			arm = np.atleast_2d(arm).T
+			val = np.dot(theta.T, arm)
+			vals.append(val[0][0])
+		return vals.index(max(vals))
+
+	def _update_bandit(self):
+		ctx = self.contexts[self.pull]
+		arm = self.arms(ctx, self.arms_idx[self.pull])
+		arm = np.atleast_2d(arm).T
+		obs = self.obs[self.pull]
+		self.V_curr += np.dot(arm, arm.T)
+		self.U_curr += obs*arm
+		#Update the provisional arms (self.V and self.U) if needed...
+		if np.linalg.det(self.V_curr) > (1+self.C)*np.linalg.det(self.V):
+			self.U = self.U_curr.copy()
+			self.V = self.V_curr.copy()
+
 class ThresholdBandit(LinUCB):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4):
 #		alpha = generator.params.alpha
@@ -207,9 +241,10 @@ class ThresholdBandit(LinUCB):
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
 class ThresholdBaselineBandit(ThresholdBandit):
-	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4):
+	def __init__(self, generator, params, delta = 0.1, n_pulls = 10000, lambd = 1e-4, exp_hor = 5):
 		self.update_theta = np.zeros(n_pulls)
-		self.theta_tilde = np.random.rand(generator.params.k, generator.params.d)
+		self.theta_tilde = params
+		self.explore_horizon = generator.params.k * exp_hor
 		super(ThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
 
 	#def choose_arms(self, ctxs):
@@ -222,16 +257,25 @@ class ThresholdBaselineBandit(ThresholdBandit):
 	#	return np.argmax(vals, axis = 1)
 
 	def _choose_arm(self, ctx):
+		if self.pull < self.explore_horizon:
+			return self.pull % self.k
+
 		vals = np.zeros(self.k)
 		preds_low = np.zeros(self.k)
 		preds_high = np.zeros(self.k)
 		viable = np.ones(self.k)
+		d = self.d
 		for idx in range(self.k):
 			arm = self.arms(ctx, idx)
 			arm = np.atleast_2d(arm).T
 			theta = np.dot(np.linalg.inv(self.V), self.U)
 			pred = np.dot(theta.T, arm)
-			pm = self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+			#pm = self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+
+			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+			beta_k = self.beta(V_k)
+			pm = self.beta(V_k)*np.sqrt(np.dot(ctx.T, np.dot(np.linalg.inv(V_k), ctx)))
+
 			pred_high = pred + pm
 			pred_low = pred - pm
 			theta_k = self.theta_tilde[idx,:]

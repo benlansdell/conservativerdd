@@ -57,9 +57,10 @@ fn_out = './runs/bandit_%s_M_%d_N_%d.npz'%(alg, M, N)
 for m in range(M):
 	params = LinearGeneratorParams(np.atleast_2d(alphas[m,:,:]), betas[m,:], d = d, k = k, intercept = intercept)
 	generator = LinearGenerator(params)
-	bandit = BanditAlg(generator)
 	#For CLUCB
 	#bandit = BanditAlg(generator, (np.squeeze(baseline_alphas[m,:]), baseline_betas[m,0]))
+	#For others
+	bandit = BanditAlg(generator)
 	print("Run: %d/%d"%(m+1,M))
 	for i in range(N):
 		(ctx, arm_idx, obs, r) = bandit.step()
