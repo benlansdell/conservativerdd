@@ -5,6 +5,7 @@ Bandits that only explore when given sufficient evidence it won't be worse than 
 Implements:
 
 * LinUCB
+* Rarely switching LinUCB
 * a greedy linear algorithm
 * some threshold bandit algorithms
-* CLUCB (from Kazerouni et al 2017)
+* Conservative linear UCB (CLUCB -- from Kazerouni et al 2017)
