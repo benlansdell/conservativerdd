@@ -91,8 +91,15 @@ for m in range(M):
 			arm_pulls[m,i,k] = 1			
 		#if i % evaluate_every == 1:
 		#	expt_reg[m,i] = expected_regret(bandit, generator)
-		if (random_eval and bandit.update_theta[bandit.pull-1] == 1) or \
-				(not random_eval and i % evaluate_every == 1) or \
+		if random_eval:
+			if bandit.update_theta[bandit.pull-1] == 1):
+				#Either the policy updates rarely, and only compute expt regret for each update, 
+				#Or the policy updates all the time, and we compare consecutive pairs of expt regret
+				ereg = expected_regret(bandit, generator)
+				print("Expected regret is now: %f"%ereg)
+				expt_regret[m,i] = ereg
+
+		if (not random_eval and i % evaluate_every == 1) or \
 				(not random_eval and i % evaluate_every == 0):
 			#Either the policy updates rarely, and only compute expt regret for each update, 
 			#Or the policy updates all the time, and we compare consecutive pairs of expt regret
