@@ -308,9 +308,9 @@ class ThresholdBaselineBandit(ThresholdBandit):
 """This bandit knows the true parameters, identifies the third best arm, on average, and always plays that. """
 class BaselineBandit(ThresholdBandit):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, exp_hor = 5):
-		#Compute the expected regret of each arm... decide on the arm to play
-
 		super(BaselineBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+		#Compute the expected regret of each arm... decide on the arm to play
+		means = 
 
 	def _choose_arm(self, ctx):
 		return self.baseline_arm
