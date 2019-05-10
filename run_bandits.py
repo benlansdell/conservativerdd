@@ -28,7 +28,7 @@ d = 5   #Dimension of context (includes one dim for intercept term)
 intercept = True
 evaluate_every = 100
 
-random_evals = ['greedy', 'linucb', 'conslinucb']
+random_evals = ['greedy', 'linucb', 'rarelyswitching']
 random_eval = alg in random_evals
 
 if alg == 'greedy':
@@ -75,24 +75,19 @@ for m in range(M):
 	generator = LinearGenerator(params)
 	#baseline = BaselineBandit(generator, (np.squeeze(baseline_alphas[m,:]), baseline_betas[m,0]))
 	if alg == 'conslinucb':
-		#For CLUCB
 		bandit = BanditAlg(generator, (np.squeeze(baseline_alphas[m,:]), baseline_betas[m,0]), alpha = 0.1)
 	else:
-		#For others
 		bandit = BanditAlg(generator)
 	print("Run: %d/%d"%(m+1,M))
 	for i in range(N):
 		(ctx, arm_idx, obs, r) = bandit.step()
-		#print((arm_idx, obs, r))
 		regret[m,i] = r
 		if arm_idx >= 0:
 			arm_pulls[m,i,arm_idx] = 1
 		else:
 			arm_pulls[m,i,k] = 1			
-		#if i % evaluate_every == 1:
-		#	expt_reg[m,i] = expected_regret(bandit, generator)
 		if random_eval:
-			if bandit.update_theta[bandit.pull-1] == 1):
+			if bandit.update_theta[bandit.pull-1] == 1:
 				#Either the policy updates rarely, and only compute expt regret for each update, 
 				#Or the policy updates all the time, and we compare consecutive pairs of expt regret
 				ereg = expected_regret(bandit, generator)
@@ -106,7 +101,8 @@ for m in range(M):
 			ereg = expected_regret(bandit, generator)
 			print("Expected regret is now: %f"%ereg)
 			expt_regret[m,i] = ereg
-	update_pol[m,:] = bandit.update_theta
+	if hasattr(bandit, 'update_theta'):
+		update_pol[m,:] = bandit.update_theta
 
 if save:
 	np.savez(fn_out, regret = regret, arm_pulls = arm_pulls, update_pol = update_pol, expt_reg = expt_reg, regret_baseline = regret_baseline)

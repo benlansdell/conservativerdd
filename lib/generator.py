@@ -46,7 +46,11 @@ class LinearGenerator(object):
 		etas = rand.randn(n)*self.params.sigma_eps
 		#print ctx, self.params.alpha[1,:]
 		exp_rewards = np.array([np.dot(ctxs[:,1:],self.params.alpha[i,:]) + self.params.beta[i] for i in range(self.params.k)])
-		exp_reward = np.array([exp_rewards[actions.astype(int)[i],i] for i in range(n)])
+
+		#Gotta be a quicker way to do this....
+		#exp_reward = np.array([exp_rewards[actions.astype(int)[i],i] for i in range(n)])
+		exp_reward = exp_rewards[actions.astype(int), np.arange(n)]
+
 		regret = np.max(exp_rewards,axis=0) - exp_reward
 		obs = exp_reward + etas
 		return obs, regret, exp_reward    

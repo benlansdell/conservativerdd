@@ -1,14 +1,15 @@
 """ Implements bandit algorithms 
 
 * LinUCB
+* Conservative LinUCB algorithm (Kazerouni et al 2017)
+* Rarely switching LinUCB
+* Greedy algorithm
+* Baseline Bandit
 * ThresholdBandit 
 * ThresholdConsBandit
-* Greedy algorithm
-* Conservative LinUCB algorithm (Kazerouni et al 2017)
+* ThresholdBaseline bandit
 
-* Rarely switching LinUCB
-* Baseline bandit
-
+Todo:
 * MinAngle bandit, replaces ThresholdConsBandit
 """
 
@@ -20,22 +21,11 @@ def first_nonzero(arr, axis, invalid_val=-1):
     return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
 #Compute expected regret for a current configuration and context distribution. A sampling approach
-def expected_regret(bandit_alg, generator, N_pulls = 100000):
+def expected_regret(bandit_alg, generator, N_pulls = 500000):
 	ctxs = generator.contexts(N_pulls)
 	actions = bandit_alg.choose_arms(ctxs)
 	_, regret, _ = generator.pulls(ctxs, actions)
 	return np.mean(regret)
-
-#Compute expected regret for a current configuration and context distribution. A sampling approach
-def expected_regret_per_arm(bandit_alg, generator, N_pulls = 100000):
-	ctxs = generator.contexts(N_pulls)
-	#Returns for each arm
-	k = bandit_alg.k
-	means = np.zeros(k)
-	for idx in range(k):
-		_, regret, _ = generator.pulls(ctxs, np.ones(N_pulls)*idx)
-		means[idx] = np.mean(regret)	
-	return means
 
 class BanditAlgorithm(object):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
@@ -110,6 +100,22 @@ class LinUCB(BanditAlgorithm):
 			ucbs.append(ucb[0][0])
 		return ucbs.index(max(ucbs))
 
+	def choose_arms(self, ctxs):
+		N = ctxs.shape[0]
+		ucbs = np.zeros((N, self.k))
+		d = self.d
+		for idx in range(self.k):
+			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+			U_k = self.U[idx*d:((idx+1)*d)]
+			theta_k = np.dot(np.linalg.inv(V_k), U_k)
+			ucb = np.dot(ctxs, theta_k)
+			a = np.dot(ctxs, np.linalg.inv(V_k))
+			b = np.multiply(a, ctxs)
+			c = np.sum(b, axis = 1)
+			ucb += np.atleast_2d(self.beta(V_k)*np.sqrt(c)).T
+			ucbs[:,idx] = np.squeeze(ucb)
+		return np.argmax(ucbs,1)
+
 	def _update_bandit(self):
 		ctx = self.contexts[self.pull]
 		arm = self.arms(ctx, self.arms_idx[self.pull])
@@ -157,6 +163,22 @@ class LinUCB(BanditAlgorithm):
 
 class GreedyBandit(LinUCB):
 
+	def choose_arms(self, ctxs):
+		N = ctxs.shape[0]
+		ucbs = np.zeros((N, self.k))
+		d = self.d
+		for idx in range(self.k):
+			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+			U_k = self.U[idx*d:((idx+1)*d)]
+			theta_k = np.dot(np.linalg.inv(V_k), U_k)
+			ucb = np.dot(ctxs, theta_k)
+			#a = np.dot(ctxs, np.linalg.inv(V_k))
+			#b = np.multiply(a, ctxs)
+			#c = np.sum(b, axis = 1)
+			#ucb += np.atleast_2d(self.beta(V_k)*np.sqrt(c)).T
+			ucbs[:,idx] = np.squeeze(ucb)
+		return np.argmax(ucbs,1)
+
 	def _choose_arm(self, ctx):
 		theta = np.dot(np.linalg.inv(self.V), self.U)
 		vals = []
@@ -173,15 +195,6 @@ class RarelySwitchingLinUCB(LinUCB):
 		super(RarelySwitchingLinUCB, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
 		self.V_curr = self.V.copy()
 		self.U_curr = self.U.copy()
-
-	def _choose_arm(self, ctx):
-		theta = np.dot(np.linalg.inv(self.V), self.U)
-		vals = []
-		for arm in [self.arms(ctx, i) for i in range(self.k)]:
-			arm = np.atleast_2d(arm).T
-			val = np.dot(theta.T, arm)
-			vals.append(val[0][0])
-		return vals.index(max(vals))
 
 	def _update_bandit(self):
 		ctx = self.contexts[self.pull]
@@ -310,7 +323,23 @@ class BaselineBandit(ThresholdBandit):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, exp_hor = 5):
 		super(BaselineBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
 		#Compute the expected regret of each arm... decide on the arm to play
-		means = 
+		means = self._expected_regret_per_arm()
+		idx = min(2, generator.params.k-1)
+		self.baseline_arm = means[idx]
+
+	#Compute expected regret for a current configuration and context distribution. A sampling approach
+	def _expected_regret_per_arm(self, N_pulls = 500000):
+		ctxs = self.generator.contexts(N_pulls)
+		#Returns for each arm
+		k = self.generator.params.k
+		means = np.zeros(k)
+		for idx in range(k):
+			_, regret, _ = self.generator.pulls(ctxs, np.ones(N_pulls)*idx)
+			means[idx] = np.mean(regret)	
+		return means
+
+	def choose_arms(self, ctxs):
+		return np.ones(ctxs.shape)*self.baseline_arm
 
 	def _choose_arm(self, ctx):
 		return self.baseline_arm
@@ -348,6 +377,9 @@ class ThresholdConsBandit(ThresholdBandit):
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
 class ThresholdMaxConsBandit(ThresholdBandit):
+
+	def _choose_arm(self, ctx):
+		raise NotImplementedError
 
 	def _update_bandit(self):
 
@@ -462,6 +494,7 @@ class ConsLinUCB(BanditAlgorithm):
 		for arm in [self.arms(ctx, i) for i in range(self.k)]:
 			arm = np.atleast_2d(arm).T
 			ucb = np.dot(theta.T, arm)
+			ucb += self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 			ucbs.append(ucb[0][0])
 		ucbs.append(expt_reward)
 		regret = max(ucbs) - expt_reward
