@@ -1,7 +1,7 @@
 """Generate pulls from a linear contextual multi-armed bandit"""
 import numpy as np 
 import numpy.random as rand
-import pandas as pd 
+#import pandas as pd 
 
 class LinearGeneratorParams(object):
 

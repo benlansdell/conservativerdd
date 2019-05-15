@@ -27,6 +27,28 @@ def expected_regret(bandit_alg, generator, N_pulls = 500000):
 	_, regret, _ = generator.pulls(ctxs, actions)
 	return np.mean(regret)
 
+#Compute expected regret for a current configuration and context distribution. A sampling approach
+def expected_regret_per_arm(generator, N_pulls = 5e6):
+	ctxs = generator.contexts(N_pulls)
+	#Returns for each arm
+	k = generator.params.k
+	means = np.zeros(k)
+	for idx in range(k):
+		_, regret, _ = generator.pulls(ctxs, np.ones(N_pulls)*idx)
+		means[idx] = np.mean(regret)	
+	return means
+
+#def expected_regret_wbaseline(bandit_alg, generator, N_pulls = 500000):
+#	regrets = np.zeros(N_pulls)
+#	ctxs = generator.contexts(N_pulls)
+#	actions = bandit_alg.choose_arms(ctxs)
+#	not_baseline = actions != -1
+#	_, regret, _ = generator.pulls(ctxs[not_baseline], actions[not_baseline])
+#
+#	#Compute baseline regret otherwise....
+#
+#	return np.mean(regret)
+
 class BanditAlgorithm(object):
 	def __init__(self, generator, delta = 0.1, n_pulls = 10000):
 		self.generator = generator
@@ -70,6 +92,12 @@ class BanditAlgorithm(object):
 
 	def predict_lower(self, ctx, arm_idx):
 		raise NotImplementedError
+
+class RCTBandit(BanditAlgorithm):
+	def _choose_arm(self, ctx):
+		return np.random.randint(self.k)
+	def _update_bandit(self):
+		pass
 
 class LinUCB(BanditAlgorithm):
 
@@ -195,6 +223,7 @@ class RarelySwitchingLinUCB(LinUCB):
 		super(RarelySwitchingLinUCB, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
 		self.V_curr = self.V.copy()
 		self.U_curr = self.U.copy()
+		self.update_theta = np.zeros(n_pulls)
 
 	def _update_bandit(self):
 		ctx = self.contexts[self.pull]
@@ -438,6 +467,23 @@ class ConsLinUCB(BanditAlgorithm):
 
 	def theta(self):
 		return np.dot(np.linalg.inv(self.V), self.U)
+
+	def choose_arms(self, ctxs):
+		#ctxs = generator.contexts(N_pulls)
+		#This will be slow!!!!!!
+		n = ctxs.shape[0]
+		arms = np.zeros(n)
+		for idx in range(n):
+			ctx = ctxs[idx,:]
+			opt_arm_idx = self._choose_opt_arm(ctx)
+			obs, regret, baseline_reward = self._play_baseline_arm(ctx)
+			L = self._compute_L(opt_arm_idx, ctx) + self.reward_baseline_cons
+			if L >= (1-self.alpha)*self.reward_baseline_all:
+				arm_idx = opt_arm_idx
+			else:
+				arm_idx = -1
+			arms[idx] = arm_idx
+		return arms
 
 	def step(self):
 		if self.pull >= self.n_pulls:
