@@ -405,43 +405,60 @@ class ThresholdConsBandit(ThresholdBandit):
 				theta_k = theta_hat_k + beta_k*diff_k/norm_k
 			self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
+def l2norm(t, V):
+	return np.dot(np.dot(t.T, V), t)
+
 class ThresholdMaxConsBandit(ThresholdBandit):
 
-	def _choose_arm(self, ctx):
-		raise NotImplementedError
+	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 0.01):
+		k = self.k
+		d = self.d
+		curr_theta = np.reshape(self.theta_tilde.copy(), (-1, 1))
+		theta_tilde = self.theta_tilde.reshape((-1, 1))
+		TT = np.kron(-np.ones((k, k))+k*np.eye(k), np.eye(d))
+		grad_step = lambda theta: (np.dot(TT,theta)*np.dot(np.dot(theta_tilde.T, TT), theta) \
+			- np.dot(TT, theta_tilde)*np.dot(np.dot(theta.T, TT), theta))/np.power(np.dot(\
+				np.dot(theta.T, TT), theta),1.5)
+		V = self.V 
+		U = self.U
+		theta_hat = np.dot(np.linalg.inv(V), U)
+		#print(theta_hat.shape)
+		beta = self.beta(V)
+
+		for idx in range(n_iter):
+			step_size = eps / np.sqrt(idx+1)
+			#Take a gradient step to minimize negative cos 
+			curr_theta += step_size*grad_step(curr_theta)
+			#Do the projection all at once... not for each arm.
+			diff = curr_theta - theta_hat 
+			norm = np.dot(diff.T, np.dot(V, diff))
+			if norm > beta:
+				curr_theta = theta_hat + beta*diff/norm
+			#Print some diagnostics....
+
+		diff = theta_tilde - theta_hat 
+		norm = np.dot(diff.T, np.dot(V, diff))
+		#del_angle = np.dot(theta_tilde.T, curr_theta)/np.linalg.norm(theta_tilde)/np.linalg.norm(curr_theta)
+		del_angle = np.dot(np.dot(theta_tilde.T, TT), curr_theta)/np.sqrt(l2norm(theta_tilde, TT)*l2norm(curr_theta, TT))
+		#IF change in angle between new and old is above a certain threshold 
+		#AND parameters are ouside plausible bounds
+		#THEN update the policy
+		if (del_angle < 1-delta) and (norm > beta):
+			self.update_theta[self.pull] = 1
+			print "Updating theta_tilde"
+			#Greedy update
+			#theta_k = theta_hat_k
+			#Conservative update
+			self.theta_tilde = curr_theta.reshape((k, d))
 
 	def _update_bandit(self):
 
 		#Update ridge regression parameters
 		super(ThresholdBandit, self)._update_bandit()
-
 		#Now we only update parameters if outside the decision boundary.
-
 		#This involves minimizing the cosine distance between the decision lines...
-
-		#Solve with ADMM? 
-
-		#Then project each theta_tilde parameter onto the confidence set for each arm
-		k = self.k
-		d = self.d
-		for idx in range(k):
-			#Get arm k's V and U
-			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
-			U_k = self.U[idx*d:((idx+1)*d)]
-			theta_k = np.atleast_2d(self.theta_tilde[idx,:]).T
-			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
-			diff_k = theta_k - theta_hat_k
-			beta_k = self.beta(V_k)
-			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
-			#If theta_k is not in confidence region then update
-			if norm_k > beta_k:
-				self.update_theta[self.pull] = 1
-				#print "Updating theta_tilde"
-				#Greedy update
-				#theta_k = theta_hat_k
-				#Conservative update
-				theta_k = theta_hat_k + beta_k*diff_k/norm_k
-			self.theta_tilde[idx,:] = np.squeeze(theta_k)
+		#We do this with a projected gradient method
+		self._projected_gradient()
 
 class ConsLinUCB(BanditAlgorithm):
 	"""
