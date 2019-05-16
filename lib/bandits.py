@@ -419,27 +419,29 @@ class ThresholdMaxConsBandit(ThresholdBandit):
 		grad_step = lambda theta: (np.dot(TT,theta)*np.dot(np.dot(theta_tilde.T, TT), theta) \
 			- np.dot(TT, theta_tilde)*np.dot(np.dot(theta.T, TT), theta))/np.power(np.dot(\
 				np.dot(theta.T, TT), theta),1.5)
+		boundary_angles = lambda a, b: np.dot(np.dot(a.T, TT), b)/np.sqrt(l2norm(a, TT)*l2norm(b, TT))
 		V = self.V 
 		U = self.U
 		theta_hat = np.dot(np.linalg.inv(V), U)
-		#print(theta_hat.shape)
 		beta = self.beta(V)
 
 		for idx in range(n_iter):
 			step_size = eps / np.sqrt(idx+1)
 			#Take a gradient step to minimize negative cos 
-			curr_theta += step_size*grad_step(curr_theta)
+			curr_theta -= step_size*grad_step(curr_theta)
 			#Do the projection all at once... not for each arm.
 			diff = curr_theta - theta_hat 
 			norm = np.dot(diff.T, np.dot(V, diff))
 			if norm > beta:
 				curr_theta = theta_hat + beta*diff/norm
 			#Print some diagnostics....
+			#print("iter: %d, angle: %f"%(idx, 180/np.pi*np.arccos(boundary_angles(theta_tilde, curr_theta))))
 
 		diff = theta_tilde - theta_hat 
-		norm = np.dot(diff.T, np.dot(V, diff))
+		norm_diff = l2norm(diff, V)
 		#del_angle = np.dot(theta_tilde.T, curr_theta)/np.linalg.norm(theta_tilde)/np.linalg.norm(curr_theta)
-		del_angle = np.dot(np.dot(theta_tilde.T, TT), curr_theta)/np.sqrt(l2norm(theta_tilde, TT)*l2norm(curr_theta, TT))
+		#del_angle = np.dot(np.dot(theta_tilde.T, TT), curr_theta)/np.sqrt(l2norm(theta_tilde, TT)*l2norm(curr_theta, TT))
+		del_angle = boundary_angles(theta_tilde, curr_theta)
 		#IF change in angle between new and old is above a certain threshold 
 		#AND parameters are ouside plausible bounds
 		#THEN update the policy

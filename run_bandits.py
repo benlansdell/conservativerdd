@@ -4,27 +4,17 @@ from lib.generator import LinearGeneratorParams, LinearGenerator
 import numpy as np
 from scipy.stats import truncnorm
 
-algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb']
+#algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb']
+algs = ['thresholdmaxcons']
 
-for alg in algs:
-	#alg = 'greedy'
-	#alg = 'linucb'
-	#alg = 'threshold'
-	#alg = 'thresholdcons'
-	#alg = 'rarelyswitching'
-	#alg = 'conslinucb'
-	
-	#alg = 'thresholdmaxcons'
-	#alg = 'thresholdbaseline'
-	
+for alg in algs:	
 	M = 30    #number of runs
 	N = 10000 #number of timesteps
 
 	delta = 1./N
-
 	#Test number of rounds
 	#N = 100
-	
+
 	save = True
 	max_alpha = 2
 	max_beta = 2
@@ -49,8 +39,8 @@ for alg in algs:
 		BanditAlg = ThresholdBandit
 	elif alg == 'thresholdcons':
 		BanditAlg = ThresholdConsBandit
-	#elif alg == 'thresholdmaxcons':
-	#	BanditAlg = ThresholdMaxConsBandit
+	elif alg == 'thresholdmaxcons':
+		BanditAlg = ThresholdMaxConsBandit
 	#elif alg == 'thresholdbaseline':
 	#	BanditAlg = ThresholdBaselineBandit
 	elif alg == 'rarelyswitching':
