@@ -117,14 +117,14 @@ for alg in algs:
 						print("Expected regret is now: %f"%ereg)
 						expt_regret[m,i] = ereg
 	
-			if (random_eval and i % evaluate_every == 1) or \
-					(random_eval and i % evaluate_every == 0):
-				#Either the policy updates rarely, and only compute expt regret for each update, 
-				#Or the policy updates all the time, and we compare consecutive pairs of expt regret
-				if not alg == 'conslinucb':
-					ereg = expected_regret(bandit, generator, N_pulls = N_expt_pulls)
-					print("Expected regret is now: %f"%ereg)
-					expt_regret[m,i] = ereg
+			#if (random_eval and i % evaluate_every == 1) or \
+			#		(random_eval and i % evaluate_every == 0):
+			#	#Either the policy updates rarely, and only compute expt regret for each update, 
+			#	#Or the policy updates all the time, and we compare consecutive pairs of expt regret
+			#	if not alg == 'conslinucb':
+			#		ereg = expected_regret(bandit, generator, N_pulls = N_expt_pulls)
+			#		print("Expected regret is now: %f"%ereg)
+			#		expt_regret[m,i] = ereg
 	
 			#Compute baseline performance for comparison
 			#expt_rewards_baseline[m,i] = np.dot(ctx[1:],np.squeeze(baseline_alphas[m,:])) + baseline_betas[m,0]
