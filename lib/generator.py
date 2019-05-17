@@ -27,7 +27,7 @@ class LinearGenerator(object):
 		return val
 
 	def contexts(self, N_pulls):
-		vals = rand.rand(N_pulls, self.params.d)*(self.params.bounds[1]-self.params.bounds[0]) + self.params.bounds[0]
+		vals = rand.rand(int(N_pulls), int(self.params.d))*(self.params.bounds[1]-self.params.bounds[0]) + self.params.bounds[0]
 		if self.params.intercept:
 			vals[:,0] = 1
 		return vals

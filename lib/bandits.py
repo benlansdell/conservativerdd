@@ -29,12 +29,12 @@ def expected_regret(bandit_alg, generator, N_pulls = 500000):
 
 #Compute expected regret for a current configuration and context distribution. A sampling approach
 def expected_regret_per_arm(generator, N_pulls = 5e6):
-	ctxs = generator.contexts(N_pulls)
+	ctxs = generator.contexts(int(N_pulls))
 	#Returns for each arm
 	k = generator.params.k
 	means = np.zeros(k)
 	for idx in range(k):
-		_, regret, _ = generator.pulls(ctxs, np.ones(N_pulls)*idx)
+		_, regret, _ = generator.pulls(ctxs, np.ones(int(N_pulls))*idx)
 		means[idx] = np.mean(regret)	
 	return means
 
@@ -120,11 +120,12 @@ class LinUCB(BanditAlgorithm):
 	def _choose_arm(self, ctx):
 		theta = np.dot(np.linalg.inv(self.V), self.U)
 		ucbs = []
+		beta = self.beta(self.V)
 		#print(np.linalg.det(self.V))
 		for arm in [self.arms(ctx, i) for i in range(self.k)]:
 			arm = np.atleast_2d(arm).T
 			ucb = np.dot(theta.T, arm)
-			ucb += self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+			ucb += beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 			ucbs.append(ucb[0][0])
 		return ucbs.index(max(ucbs))
 
@@ -132,6 +133,7 @@ class LinUCB(BanditAlgorithm):
 		N = ctxs.shape[0]
 		ucbs = np.zeros((N, self.k))
 		d = self.d
+		beta = self.beta(self.V)
 		for idx in range(self.k):
 			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
 			U_k = self.U[idx*d:((idx+1)*d)]
@@ -140,7 +142,7 @@ class LinUCB(BanditAlgorithm):
 			a = np.dot(ctxs, np.linalg.inv(V_k))
 			b = np.multiply(a, ctxs)
 			c = np.sum(b, axis = 1)
-			ucb += np.atleast_2d(self.beta(V_k)*np.sqrt(c)).T
+			ucb += np.atleast_2d(beta*np.sqrt(c)).T
 			ucbs[:,idx] = np.squeeze(ucb)
 		return np.argmax(ucbs,1)
 
@@ -266,30 +268,18 @@ class ThresholdBandit(LinUCB):
 		return vals.index(max(vals))
 
 	def _update_bandit(self):
-
 		#Update ridge regression parameters
 		super(ThresholdBandit, self)._update_bandit()
-
 		#Then project each theta_tilde parameter onto the confidence set for each arm
 		k = self.k
 		d = self.d
-		for idx in range(k):
-			#Get arm k's V and U
-			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
-			U_k = self.U[idx*d:((idx+1)*d)]
-			theta_k = np.atleast_2d(self.theta_tilde[idx,:]).T
-			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
-			diff_k = theta_k - theta_hat_k
-			beta_k = self.beta(V_k)
-			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
-			#If theta_k is not in confidence region then update
-			if norm_k > beta_k:
-				self.update_theta[self.pull] = 1
-				#Greedy update
-				theta_k = theta_hat_k
-				#Conservative update
-				#theta_k = theta_hat_k + beta_k*diff_k/norm_k
-			self.theta_tilde[idx,:] = np.squeeze(theta_k)
+		beta = self.beta(self.V)
+		theta_hat = np.dot(np.linalg.inv(self.V), self.U)
+		diff = self.theta_tilde.reshape((-1, 1)) - theta_hat 
+		norm = np.dot(diff.T, np.dot(self.V, diff))
+		if norm > beta:
+			self.theta_tilde = theta_hat.reshape((k, d))
+			self.update_theta[self.pull] = 1
 
 class ThresholdBaselineBandit(ThresholdBandit):
 	def __init__(self, generator, params, delta = 0.1, n_pulls = 10000, lambd = 1e-4, exp_hor = 5):
@@ -316,6 +306,7 @@ class ThresholdBaselineBandit(ThresholdBandit):
 		preds_high = np.zeros(self.k)
 		viable = np.ones(self.k)
 		d = self.d
+		beta = self.beta(self.V)
 		for idx in range(self.k):
 			arm = self.arms(ctx, idx)
 			arm = np.atleast_2d(arm).T
@@ -324,8 +315,7 @@ class ThresholdBaselineBandit(ThresholdBandit):
 			#pm = self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 
 			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
-			beta_k = self.beta(V_k)
-			pm = self.beta(V_k)*np.sqrt(np.dot(ctx.T, np.dot(np.linalg.inv(V_k), ctx)))
+			pm = beta*np.sqrt(np.dot(ctx.T, np.dot(np.linalg.inv(V_k), ctx)))
 
 			pred_high = pred + pm
 			pred_low = pred - pm
@@ -386,31 +376,38 @@ class ThresholdConsBandit(ThresholdBandit):
 		#Then project each theta_tilde parameter onto the confidence set for each arm
 		k = self.k
 		d = self.d
-		for idx in range(k):
-			#Get arm k's V and U
-			V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
-			U_k = self.U[idx*d:((idx+1)*d)]
-			theta_k = np.atleast_2d(self.theta_tilde[idx,:]).T
-			theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
-			diff_k = theta_k - theta_hat_k
-			beta_k = self.beta(V_k)
-			norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
-			#If theta_k is not in confidence region then update
-			if norm_k > beta_k:
-				self.update_theta[self.pull] = 1
-				#print "Updating theta_tilde"
-				#Greedy update
-				#theta_k = theta_hat_k
-				#Conservative update
-				theta_k = theta_hat_k + beta_k*diff_k/norm_k
-			self.theta_tilde[idx,:] = np.squeeze(theta_k)
+		beta = self.beta(self.V)
+		theta_hat = np.dot(np.linalg.inv(self.V), self.U)
+		diff = self.theta_tilde.reshape((-1, 1)) - theta_hat 
+		norm = np.dot(diff.T, np.dot(self.V, diff))
+		if norm > beta:
+			self.update_theta[self.pull] = 1
+			self.theta_tilde = (theta_hat + beta*diff/norm).reshape((k, d))
+
+		#for idx in range(k):
+		#	#Get arm k's V and U
+		#	V_k = self.V[idx*d:((idx+1)*d),idx*d:((idx+1)*d)]
+		#	U_k = self.U[idx*d:((idx+1)*d)]
+		#	theta_k = np.atleast_2d(self.theta_tilde[idx,:]).T
+		#	theta_hat_k = np.dot(np.linalg.inv(V_k), U_k)
+		#	diff_k = theta_k - theta_hat_k
+		#	norm_k = np.dot(diff_k.T, np.dot(V_k, diff_k))
+		#	#If theta_k is not in confidence region then update
+		#	if norm_k > beta_k:
+		#		self.update_theta[self.pull] = 1
+		#		#print "Updating theta_tilde"
+		#		#Greedy update
+		#		#theta_k = theta_hat_k
+		#		#Conservative update
+		#		theta_k = theta_hat_k + beta_k*diff_k/norm_k
+		#	self.theta_tilde[idx,:] = np.squeeze(theta_k)
 
 def l2norm(t, V):
 	return np.dot(np.dot(t.T, V), t)
 
 class ThresholdMaxConsBandit(ThresholdBandit):
 
-	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 0.01):
+	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 1e-2):
 		k = self.k
 		d = self.d
 		curr_theta = np.reshape(self.theta_tilde.copy(), (-1, 1))
@@ -445,7 +442,7 @@ class ThresholdMaxConsBandit(ThresholdBandit):
 		#IF change in angle between new and old is above a certain threshold 
 		#AND parameters are ouside plausible bounds
 		#THEN update the policy
-		if (del_angle < 1-delta) and (norm > beta):
+		if (del_angle < 1-delta) and (norm_diff > beta):
 			self.update_theta[self.pull] = 1
 			print "Updating theta_tilde"
 			#Greedy update
@@ -464,7 +461,7 @@ class ThresholdMaxConsBandit(ThresholdBandit):
 
 class ThresholdMaxConsGreedyBandit(ThresholdBandit):
 
-	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 0.01):
+	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 1e-2):
 		k = self.k
 		d = self.d
 		curr_theta = np.reshape(self.theta_tilde.copy(), (-1, 1))
@@ -499,7 +496,7 @@ class ThresholdMaxConsGreedyBandit(ThresholdBandit):
 		#IF change in angle between new and old is above a certain threshold 
 		#AND parameters are ouside plausible bounds
 		#THEN update the policy
-		if (del_angle < 1-delta) and (norm > beta):
+		if (del_angle < 1-delta) and (norm_diff > beta):
 			self.update_theta[self.pull] = 1
 			print "Updating theta_tilde"
 			#Greedy update
@@ -610,10 +607,11 @@ class ConsLinUCB(BanditAlgorithm):
 		#Compare w optimistic arms to get regret
 		ucbs = []
 		theta = np.dot(np.linalg.inv(self.V), self.U)
+		beta = self.beta(self.V)
 		for arm in [self.arms(ctx, i) for i in range(self.k)]:
 			arm = np.atleast_2d(arm).T
 			ucb = np.dot(theta.T, arm)
-			ucb += self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+			ucb += beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 			ucbs.append(ucb[0][0])
 		ucbs.append(expt_reward)
 		regret = max(ucbs) - expt_reward
@@ -622,10 +620,11 @@ class ConsLinUCB(BanditAlgorithm):
 	def _choose_opt_arm(self, ctx):
 		theta = np.dot(np.linalg.inv(self.V), self.U)
 		ucbs = []
+		beta = self.beta(self.V)
 		for arm in [self.arms(ctx, i) for i in range(self.k)]:
 			arm = np.atleast_2d(arm).T
 			ucb = np.dot(theta.T, arm)
-			ucb += self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+			ucb += beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 			ucbs.append(ucb[0][0])
 		return ucbs.index(max(ucbs))
 
@@ -663,7 +662,7 @@ class ConsLinUCB(BanditAlgorithm):
 			U_k = self.U[idx*d:((idx+1)*d)]
 			theta = np.dot(np.linalg.inv(V_k), U_k)
 			pred = np.dot(theta.T, ctx)
-			pred -= self.beta(V_k)*np.sqrt(np.dot(ctx.T, np.dot(np.linalg.inv(V_k), ctx)))
+			pred -= self.beta(self.V)*np.sqrt(np.dot(ctx.T, np.dot(np.linalg.inv(V_k), ctx)))
 		return pred
 
 	def pred_arm(self, arm_idx, N = 100):
