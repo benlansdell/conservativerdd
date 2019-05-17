@@ -4,8 +4,7 @@ from lib.generator import LinearGeneratorParams, LinearGenerator
 import numpy as np
 from scipy.stats import truncnorm
 
-#algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons']
-algs = ['thresholdmaxconsgreedy']
+algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons', 'thresholdmaxconsgreedy']
 
 for alg in algs:	
 	M = 50    #number of runs
