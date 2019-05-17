@@ -1,14 +1,14 @@
-from lib.bandits import LinUCB, ThresholdBandit, ThresholdConsBandit, ThresholdMaxConsBandit, \
+from lib.bandits import LinUCB, ThresholdBandit, ThresholdConsBandit, ThresholdMaxConsBandit, ThresholdMaxConsGreedyBandit, \
 				GreedyBandit, ConsLinUCB, RarelySwitchingLinUCB, ThresholdBaselineBandit, expected_regret, expected_regret_per_arm
 from lib.generator import LinearGeneratorParams, LinearGenerator
 import numpy as np
 from scipy.stats import truncnorm
 
-#algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb']
-algs = ['thresholdmaxcons']
+#algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons']
+algs = ['thresholdmaxconsgreedy']
 
 for alg in algs:	
-	M = 30    #number of runs
+	M = 50    #number of runs
 	N = 10000 #number of timesteps
 
 	delta = 1./N
@@ -41,6 +41,8 @@ for alg in algs:
 		BanditAlg = ThresholdConsBandit
 	elif alg == 'thresholdmaxcons':
 		BanditAlg = ThresholdMaxConsBandit
+	elif alg == 'thresholdmaxconsgreedy':
+		BanditAlg = ThresholdMaxConsGreedyBandit
 	#elif alg == 'thresholdbaseline':
 	#	BanditAlg = ThresholdBaselineBandit
 	elif alg == 'rarelyswitching':
