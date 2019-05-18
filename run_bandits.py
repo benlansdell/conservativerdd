@@ -114,8 +114,8 @@ def main():
 			generator = LinearGenerator(params)
 			#Choose the baseline arm as the worst arm....
 			means = expected_regret_per_arm(generator)
-		    sorted_means = np.sort(means)
-    		m_idx = np.where(means == sorted_means[baseline_idx])[0][0]
+			sorted_means = np.sort(means)
+			m_idx = np.where(means == sorted_means[baseline_idx])[0][0]
 			base_alpha = alphas[m,m_idx,:]
 			base_beta = betas[m,m_idx]
 		
