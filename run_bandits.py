@@ -43,7 +43,7 @@ def main():
 		#d = 2   #Dimension of context (includes one dim for intercept term)
 		intercept = True
 		evaluate_every = 100
-		baseline_idx = 1
+		baseline_idx = 0
 		
 		N_expt_pulls_others = 500000
 		N_expt_pulls_CLUCB = 10000
@@ -75,10 +75,11 @@ def main():
 		
 		#Generate slopes and intercepts
 		alphas = truncnorm.rvs(-max_alpha, max_alpha, scale = 1, size=(M,k,d-1))
-		if alg == 'conslinucb':
-			betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))+1
-		else:
-			betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))
+		#if alg == 'conslinucb':
+		#	betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))+1
+		#else:
+		#	betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))
+		betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))+1
 		
 		#baseline_alphas = truncnorm.rvs(-max_alpha, max_alpha, scale = 1, size=(M,1,d-1))
 		#baseline_betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,1))
