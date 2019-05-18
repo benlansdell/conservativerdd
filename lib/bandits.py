@@ -8,9 +8,9 @@
 * ThresholdBandit 
 * ThresholdConsBandit
 * ThresholdBaseline bandit
+* ThresholdMaxConsBandit
+* ThresholdMaxConsGreedyBandit
 
-Todo:
-* MinAngle bandit, replaces ThresholdConsBandit
 """
 
 import numpy as np
@@ -605,16 +605,16 @@ class ConsLinUCB(BanditAlgorithm):
 		expt_reward = np.dot(ctx[1:],self.baseline_alpha) + self.baseline_beta
 		obs = expt_reward + eta
 		#Compare w optimistic arms to get regret
-		ucbs = []
-		theta = np.dot(np.linalg.inv(self.V), self.U)
-		beta = self.beta(self.V)
-		for arm in [self.arms(ctx, i) for i in range(self.k)]:
-			arm = np.atleast_2d(arm).T
-			ucb = np.dot(theta.T, arm)
-			ucb += beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
-			ucbs.append(ucb[0][0])
-		ucbs.append(expt_reward)
-		regret = max(ucbs) - expt_reward
+		#theta = np.dot(np.linalg.inv(self.V), self.U)
+		#beta = self.beta(self.V)
+		#for arm in [self.arms(ctx, i) for i in range(self.k)]:
+		#	arm = np.atleast_2d(arm).T
+		#	ucb = np.dot(theta.T, arm)
+		#	ucb += beta*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
+		#	ucbs.append(ucb[0][0])
+		#	expt_rs = np.dot(ctx[1:],self.generator.alphas) + self.generator.
+		exp_rewards = [np.dot(ctx[1:],self.generator.params.alpha[i,:]) + self.generator.params.beta[i] for i in range(self.k)]
+		regret = max(exp_rewards) - expt_reward
 		return obs, regret, expt_reward
 
 	def _choose_opt_arm(self, ctx):
