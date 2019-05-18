@@ -22,6 +22,7 @@ for alg in algs:
 	d = 2   #Dimension of context (includes one dim for intercept term)
 	intercept = True
 	evaluate_every = 100
+	baseline_idx = 1
 	
 	N_expt_pulls_others = 500000
 	N_expt_pulls_CLUCB = 10000
@@ -91,7 +92,8 @@ for alg in algs:
 		generator = LinearGenerator(params)
 		#Choose the baseline arm as the worst arm....
 		means = expected_regret_per_arm(generator)
-		m_idx = np.argmin(means)
+	    sorted_means = np.sort(means)
+    	m_idx = np.where(means == sorted_means[baseline_idx])[0][0]
 		base_alpha = alphas[m,m_idx,:]
 		base_beta = betas[m,m_idx]
 	
@@ -107,7 +109,8 @@ for alg in algs:
 			if arm_idx >= 0:
 				arm_pulls[m,i,arm_idx] = 1
 			else:
-				arm_pulls[m,i,k] = 1			
+				arm_pulls[m,i,k] = 1		
+				arm_idx  = m_idx
 			if not random_eval:
 				if bandit.update_theta[bandit.pull-1] == 1:
 					#Either the policy updates rarely, and only compute expt regret for each update, 
