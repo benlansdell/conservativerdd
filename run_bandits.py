@@ -43,6 +43,7 @@ def main():
 		#d = 2   #Dimension of context (includes one dim for intercept term)
 		intercept = True
 		evaluate_every = 100
+		baseline_idx = 1
 		
 		N_expt_pulls_others = 500000
 		N_expt_pulls_CLUCB = 10000
@@ -75,7 +76,7 @@ def main():
 		#Generate slopes and intercepts
 		alphas = truncnorm.rvs(-max_alpha, max_alpha, scale = 1, size=(M,k,d-1))
 		if alg == 'conslinucb':
-			betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))+4
+			betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))+1
 		else:
 			betas = truncnorm.rvs(-max_beta, max_beta, scale = 1, size=(M,k))
 		
@@ -112,7 +113,8 @@ def main():
 			generator = LinearGenerator(params)
 			#Choose the baseline arm as the worst arm....
 			means = expected_regret_per_arm(generator)
-			m_idx = np.argmin(means)
+		    sorted_means = np.sort(means)
+    		m_idx = np.where(means == sorted_means[baseline_idx])[0][0]
 			base_alpha = alphas[m,m_idx,:]
 			base_beta = betas[m,m_idx]
 		
