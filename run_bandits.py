@@ -5,7 +5,9 @@ import numpy as np
 from scipy.stats import truncnorm
 import argparse
 
-algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons', 'thresholdmaxconsgreedy']
+#algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons', 'thresholdmaxconsgreedy']
+
+algs = ['conslinucb']
 
 def get_args():
 	argparser = argparse.ArgumentParser(description=__doc__)
@@ -132,6 +134,7 @@ def main():
 					arm_pulls[m,i,arm_idx] = 1
 				else:
 					arm_pulls[m,i,k] = 1			
+					arm_idx = m_idx
 				if not random_eval:
 					if bandit.update_theta[bandit.pull-1] == 1:
 						#Either the policy updates rarely, and only compute expt regret for each update, 
