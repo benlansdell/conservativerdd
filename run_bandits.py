@@ -5,9 +5,9 @@ import numpy as np
 from scipy.stats import truncnorm
 import argparse
 
-#algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons', 'thresholdmaxconsgreedy']
+algs = ['greedy','linucb','threshold','thresholdcons','rarelyswitching','conslinucb', 'thresholdmaxcons', 'thresholdmaxconsgreedy']
 
-algs = ['conslinucb']
+#algs = ['conslinucb']
 
 def get_args():
 	argparser = argparse.ArgumentParser(description=__doc__)
