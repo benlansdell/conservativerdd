@@ -407,6 +407,10 @@ def l2norm(t, V):
 
 class ThresholdMaxConsBandit(ThresholdBandit):
 
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, Delta_angle = 1e-2):
+		self.Delta_angle = Delta_angle
+		super(ThresholdMaxConsBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+
 	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 1e-2):
 		k = self.k
 		d = self.d
@@ -442,7 +446,7 @@ class ThresholdMaxConsBandit(ThresholdBandit):
 		#IF change in angle between new and old is above a certain threshold 
 		#AND parameters are ouside plausible bounds
 		#THEN update the policy
-		if (del_angle < 1-delta) and (norm_diff > beta):
+		if (del_angle < 1-self.Delta_angle) and (norm_diff > beta):
 			self.update_theta[self.pull] = 1
 			print "Updating theta_tilde"
 			#Greedy update
@@ -461,6 +465,11 @@ class ThresholdMaxConsBandit(ThresholdBandit):
 
 class ThresholdMaxConsGreedyBandit(ThresholdBandit):
 
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, Delta_angle = 1e-2):
+		self.Delta_angle = Delta_angle
+		super(ThresholdMaxConsGreedyBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+
+
 	def _projected_gradient(self, eps = 0.1, n_iter = 100, delta = 1e-2):
 		k = self.k
 		d = self.d
@@ -496,7 +505,7 @@ class ThresholdMaxConsGreedyBandit(ThresholdBandit):
 		#IF change in angle between new and old is above a certain threshold 
 		#AND parameters are ouside plausible bounds
 		#THEN update the policy
-		if (del_angle < 1-delta) and (norm_diff > beta):
+		if (del_angle < 1-self.Delta_angle) and (norm_diff > beta):
 			self.update_theta[self.pull] = 1
 			print "Updating theta_tilde"
 			#Greedy update
