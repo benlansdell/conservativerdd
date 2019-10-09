@@ -687,3 +687,50 @@ class ConsLinUCB(BanditAlgorithm):
 			lower = pred - self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 			upper = pred + self.beta(self.V)*np.sqrt(np.dot(arm.T, np.dot(np.linalg.inv(self.V), arm)))
 		return pred, lower, upper
+
+class DeterministicThresholdBandit(LinUCB):
+	"""
+	This bandit simply updates its arm parameters on a deterministic schedule. 
+
+	It updates its parameters at a rate proportional to \sqrt{T} (T is number of rounds)
+	"""
+	def __init__(self, generator, delta = 0.1, n_pulls = 10000, lambd = 1e-4, starting_rate = 0.1):
+		self.update_theta = np.zeros(n_pulls)
+		self.theta_tilde = np.random.rand(generator.params.k, generator.params.d)
+		self.starting_rate = starting_rate
+		self.changes = 0
+		self.change_func = lambda x: int(self.starting_rate*np.sqrt(x))
+		super(DeterministicThresholdBandit, self).__init__(generator, delta = delta, n_pulls = n_pulls, lambd = lambd)
+
+	def choose_arms(self, ctxs):
+		N = ctxs.shape[0]
+		vals = np.zeros((N, self.k))
+		for idx in range(self.k):
+			theta_k = self.theta_tilde[idx,:]
+			val = np.dot(ctxs,theta_k)
+			vals[:,idx] = val
+		return np.argmax(vals, axis = 1)
+
+	def _choose_arm(self, ctx):
+		vals = []
+		for idx in range(self.k):
+			theta_k = self.theta_tilde[idx,:]
+			val = np.dot(theta_k.T, ctx)
+			vals.append(val)
+		return vals.index(max(vals))
+
+	def _update_bandit(self):
+		#Update the ridge regression parameters
+		super(DeterministicThresholdBandit, self)._update_bandit()
+		c = self.change_func(self.pull)
+		if self.changes != c:
+			#Then project each theta_tilde parameter onto the confidence set for each arm
+			k = self.k
+			d = self.d
+			beta = self.beta(self.V)
+			theta_hat = np.dot(np.linalg.inv(self.V), self.U)
+			diff = self.theta_tilde.reshape((-1, 1)) - theta_hat 
+			norm = np.dot(diff.T, np.dot(self.V, diff))
+			self.theta_tilde = theta_hat.reshape((k, d))
+			self.update_theta[self.pull] = 1
+		self.changes = c
