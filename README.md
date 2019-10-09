@@ -1,6 +1,6 @@
 # Conservative linear bandits
 
-Bandits that only explore when given sufficient evidence it won't be worse than a baseline.
+Bandits that only explore when given sufficient evidence it will improve the policy
 
 Implements:
 
